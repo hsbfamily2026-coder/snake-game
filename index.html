@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스네이크 게임</title>
+<style>
+  body {
+    margin: 0;
+    padding: 20px 0;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  #snakeGameBox {
+    max-width: 340px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  #snakeGameBox .snakeBtn {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    border: none;
+    border-radius: 8px;
+    background: #333;
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+  }
+  #snakeGameBox .snakeBtn:active { background: #555; }
+  #snakeRestartBtn {
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  #snakeNameForm input {
+    padding: 6px;
+    width: 140px;
+  }
+  #snakeNameForm button {
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  #snakeLeaderboardBox {
+    margin-top: 16px;
+    text-align: left;
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="snakeGameBox">
+  <div style="margin-bottom:8px;">
+    <span style="font-weight:bold;">점수: </span><span id="snakeScore">0</span>
+    &nbsp;&nbsp;
+    <button id="snakeRestartBtn">다시 시작</button>
+  </div>
+  <canvas id="snakeCanvas" width="300" height="300" style="border:2px solid #333;background:#111;touch-action:none;"></canvas>
+  <div id="snakeMsg" style="margin-top:6px;color:#e74c3c;font-weight:bold;min-height:20px;"></div>
+
+  <div id="snakeNameForm" style="display:none;margin-top:8px;">
+    <input id="snakeNameInput" type="text" maxlength="10" placeholder="닉네임 입력">
+    <button id="snakeSubmitBtn">등록</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3, 50px);grid-template-rows:repeat(3,50px);gap:4px;justify-content:center;margin-top:12px;">
+    <div></div>
+    <button class="snakeBtn" data-dir="up">▲</button>
+    <div></div>
+    <button class="snakeBtn" data-dir="left">◀</button>
+    <div></div>
+    <button class="snakeBtn" data-dir="right">▶</button>
+    <div></div>
+    <button class="snakeBtn" data-dir="down">▼</button>
+    <div></div>
+  </div>
+
+  <div id="snakeLeaderboardBox">
+    <div style="font-weight:bold;margin-bottom:6px;">🏆 랭킹 TOP 10</div>
+    <ol id="snakeLeaderboard" style="margin:0;padding-left:20px;"></ol>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ▼▼▼ 구글 시트 랭킹 기능을 쓰려면 아래 URL을 배포된 웹앱 주소로 교체하세요 ▼▼▼
+  // 랭킹 기능이 필요 없으면 이 줄은 그대로 두어도 게임 자체는 정상 작동합니다.
+  var SCRIPT_URL = "여기에_배포된_웹앱_URL_붙여넣기";
+
+  var canvas = document.getElementById('snakeCanvas');
+  var ctx = canvas.getContext('2d');
+  var scoreEl = document.getElementById('snakeScore');
+  var msgEl = document.getElementById('snakeMsg');
+  var restartBtn = document.getElementById('snakeRestartBtn');
+  var nameForm = document.getElementById('snakeNameForm');
+  var nameInput = document.getElementById('snakeNameInput');
+  var submitBtn = document.getElementById('snakeSubmitBtn');
+  var leaderboardEl = document.getElementById('snakeLeaderboard');
+
+  var gridSize = 15;
+  var cellSize = canvas.width / gridSize;
+  var snake, direction, nextDirection, food, score, gameInterval, gameOver;
+
+  function randomFood(){
+    var pos;
+    do{
+      pos = { x: Math.floor(Math.random()*gridSize), y: Math.floor(Math.random()*gridSize) };
+    } while(snake.some(function(s){ return s.x===pos.x && s.y===pos.y; }));
+    return pos;
+  }
+
+  function init(){
+    snake = [{x:7,y:7},{x:6,y:7},{x:5,y:7}];
+    direction = 'right';
+    nextDirection = 'right';
+    score = 0;
+    gameOver = false;
+    food = randomFood();
+    scoreEl.textContent = score;
+    msgEl.textContent = '';
+    nameForm.style.display = 'none';
+    if(gameInterval) clearInterval(gameInterval);
+    gameInterval = setInterval(tick, 120);
+    draw();
+  }
+
+  function tick(){
+    if(gameOver) return;
+    direction = nextDirection;
+    var head = {x: snake[0].x, y: snake[0].y};
+    if(direction==='up') head.y -= 1;
+    else if(direction==='down') head.y += 1;
+    else if(direction==='left') head.x -= 1;
+    else if(direction==='right') head.x += 1;
+
+    if(head.x<0 || head.x>=gridSize || head.y<0 || head.y>=gridSize ||
+       snake.some(function(s){ return s.x===head.x && s.y===head.y; })){
+      endGame();
+      return;
+    }
+
+    snake.unshift(head);
+
+    if(head.x===food.x && head.y===food.y){
+      score += 10;
+      scoreEl.textContent = score;
+      food = randomFood();
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+
+  function endGame(){
+    gameOver = true;
+    clearInterval(gameInterval);
+    msgEl.textContent = '게임 오버! 점수: ' + score;
+    if(score > 0){
+      nameForm.style.display = 'block';
+    }
+  }
+
+  function draw(){
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(food.x*cellSize, food.y*cellSize, cellSize, cellSize);
+    snake.forEach(function(s, i){
+      ctx.fillStyle = i===0 ? '#2ecc71' : '#27ae60';
+      ctx.fillRect(s.x*cellSize+1, s.y*cellSize+1, cellSize-2, cellSize-2);
+    });
+  }
+
+  function changeDirection(dir){
+    var opposite = {up:'down', down:'up', left:'right', right:'left'};
+    if(dir === opposite[direction]) return;
+    nextDirection = dir;
+  }
+
+  document.addEventListener('keydown', function(e){
+    var map = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'};
+    if(map[e.key]){
+      e.preventDefault();
+      changeDirection(map[e.key]);
+    }
+  }, {passive:false});
+
+  document.querySelectorAll('#snakeGameBox .snakeBtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      changeDirection(btn.getAttribute('data-dir'));
+    });
+    btn.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      changeDirection(btn.getAttribute('data-dir'));
+    }, {passive:false});
+  });
+
+  restartBtn.addEventListener('click', init);
+
+  // 점수 등록
+  submitBtn.addEventListener('click', function(){
+    var name = nameInput.value.trim();
+    if(!name){ alert('닉네임을 입력해주세요.'); return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = '등록 중...';
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ name: name, score: score })
+    }).then(function(){
+      nameForm.style.display = 'none';
+      loadLeaderboard();
+    }).catch(function(){
+      alert('등록에 실패했습니다. 다시 시도해주세요.');
+    }).finally(function(){
+      submitBtn.disabled = false;
+      submitBtn.textContent = '등록';
+    });
+  });
+
+  // 랭킹 불러오기
+  function loadLeaderboard(){
+    if(!SCRIPT_URL || SCRIPT_URL.indexOf('여기에') === 0){
+      leaderboardEl.innerHTML = '<li>랭킹 기능 설정 전입니다.</li>';
+      return;
+    }
+    fetch(SCRIPT_URL)
+      .then(function(res){ return res.json(); })
+      .then(function(list){
+        leaderboardEl.innerHTML = '';
+        if(list.length === 0){
+          leaderboardEl.innerHTML = '<li>아직 기록이 없습니다.</li>';
+          return;
+        }
+        list.forEach(function(item){
+          var li = document.createElement('li');
+          li.textContent = item.name + ' - ' + item.score + '점';
+          leaderboardEl.appendChild(li);
+        });
+      })
+      .catch(function(){
+        leaderboardEl.innerHTML = '<li>랭킹을 불러올 수 없습니다.</li>';
+      });
+  }
+
+  init();
+  loadLeaderboard();
+})();
+</script>
+
+</body>
+</html>
